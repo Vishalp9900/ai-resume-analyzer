@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+
+uploads/
+*.log
+
+venv/
+.venv/
+
+{templates,static/

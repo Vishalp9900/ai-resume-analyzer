@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Resume Analyzer</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+  header{background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:24px 40px;display:flex;align-items:center;gap:14px}
+  header h1{font-size:1.6rem;font-weight:700;color:#fff}
+  header span{font-size:0.85rem;background:#3b82f6;padding:3px 10px;border-radius:20px;color:#fff}
+  .container{max-width:900px;margin:40px auto;padding:0 20px}
+  .card{background:#1e293b;border-radius:14px;padding:28px;margin-bottom:24px;border:1px solid #334155}
+  .card h2{font-size:1.1rem;color:#94a3b8;margin-bottom:18px;text-transform:uppercase;letter-spacing:.05em}
+  label{display:block;font-size:.85rem;color:#94a3b8;margin-bottom:6px}
+  .upload-zone{border:2px dashed #334155;border-radius:10px;padding:36px;text-align:center;cursor:pointer;transition:.2s;position:relative}
+  .upload-zone:hover,.upload-zone.drag{border-color:#3b82f6;background:#1e3a8a22}
+  .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .upload-zone .icon{font-size:2.5rem;margin-bottom:8px}
+  .upload-zone p{color:#64748b;font-size:.9rem}
+  .upload-zone .filename{color:#3b82f6;font-weight:600;margin-top:6px}
+  textarea{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;color:#e2e8f0;font-size:.88rem;resize:vertical;min-height:100px;outline:none}
+  textarea:focus{border-color:#3b82f6}
+  .btn{background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:none;padding:13px 36px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;transition:.2s;margin-top:6px}
+  .btn:hover{opacity:.9;transform:translateY(-1px)}
+  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .results{display:none}
+  .score-hero{text-align:center;padding:20px 0}
+  .score-circle{width:130px;height:130px;border-radius:50%;margin:0 auto 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:2.4rem;font-weight:800;border:5px solid}
+  .score-num{line-height:1}
+  .score-label{font-size:.75rem;color:#94a3b8;margin-top:2px}
+  .grade-badge{display:inline-block;padding:4px 18px;border-radius:20px;font-weight:700;font-size:1.1rem;margin-bottom:6px}
+  .grade-A{background:#064e3b;color:#34d399;border-color:#34d399}
+  .grade-B{background:#1e3a5f;color:#60a5fa;border-color:#60a5fa}
+  .grade-C{background:#431407;color:#fb923c;border-color:#fb923c}
+  .grade-D{background:#450a0a;color:#f87171;border-color:#f87171}
+  .bar-row{margin-bottom:12px}
+  .bar-label{display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px;color:#cbd5e1}
+  .bar-track{background:#0f172a;border-radius:20px;height:10px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:20px;transition:width 1s ease}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .chip{padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:500}
+  .chip.found{background:#064e3b;color:#34d399}
+  .chip.missing{background:#450a0a;color:#fca5a5}
+  .chip.flag{background:#431407;color:#fdba74}
+  .tip-row{background:#0f172a;border-radius:8px;padding:11px 14px;margin-bottom:8px;border-left:3px solid #3b82f6;font-size:.85rem;color:#cbd5e1}
+  .jd-score{text-align:center;padding:14px;background:#0f172a;border-radius:10px}
+  .jd-score .num{font-size:2rem;font-weight:800;color:#3b82f6}
+  .spinner{display:none;text-align:center;padding:20px;color:#64748b}
+  .spinner svg{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:600px){.two-col{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🤖 AI Resume Analyzer</h1>
+  </div>
+  <span>ATS Score Engine</span>
+</header>
+
+<div class="container">
+  <div class="card">
+    <h2>Upload Resume</h2>
+    <div class="upload-zone" id="dropZone">
+      <input type="file" id="resumeFile" accept=".pdf"/>
+      <div class="icon">📄</div>
+      <p>Drop your PDF resume here or <strong style="color:#3b82f6">click to browse</strong></p>
+      <div class="filename" id="fileName"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Paste Job Description <span style="color:#64748b;font-weight:400;font-size:.8rem">(optional but recommended)</span></h2>
+    <textarea id="jobDesc" placeholder="Paste the job description here to get a JD match score..."></textarea>
+  </div>
+
+  <button class="btn" id="analyzeBtn" onclick="analyze()">🔍 Analyze My Resume</button>
+
+  <div class="spinner" id="spinner">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+    </svg>
+    <p style="margin-top:10px">Analyzing your resume...</p>
+  </div>
+
+  <div class="results" id="results">
+
+    <div class="card">
+      <div class="score-hero">
+        <div class="score-circle" id="scoreCircle">
+          <span class="score-num" id="scoreNum">--</span>
+          <span class="score-label">/ 100</span>
+        </div>
+        <div class="grade-badge" id="gradeBadge">Grade</div>
+        <p style="color:#94a3b8;font-size:.88rem" id="scoreMsg"></p>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card" id="jdCard" style="display:none">
+        <h2>JD Match Score</h2>
+        <div class="jd-score">
+          <div class="num" id="jdScore">--%</div>
+          <p style="color:#94a3b8;font-size:.82rem;margin-top:4px">Resume vs Job Description similarity</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Resume Stats</h2>
+        <p style="font-size:.88rem;color:#cbd5e1">Word count: <strong id="wordCount">--</strong></p>
+        <p style="font-size:.88rem;color:#cbd5e1;margin-top:8px">Red flags: <strong id="flagCount" style="color:#f87171">--</strong></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Category Breakdown</h2>
+      <div id="breakdown"></div>
+    </div>
+
+    <div class="card">
+      <h2>⚠️ Missing Keywords (Add These!)</h2>
+      <div class="chips" id="missingChips"></div>
+    </div>
+
+    <div class="card" id="flagsCard">
+      <h2>🚩 Red Flags</h2>
+      <div class="chips" id="flagChips"></div>
+    </div>
+
+    <div class="card">
+      <h2>💡 Actionable Tips to Improve</h2>
+      <div id="tips"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('resumeFile');
+const fileName  = document.getElementById('fileName');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) fileName.textContent = '✅ ' + fileInput.files[0].name;
+});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  fileInput.files = e.dataTransfer.files;
+  if (fileInput.files[0]) fileName.textContent = '✅ ' + fileInput.files[0].name;
+});
+
+const BAR_COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ec4899'];
+
+async function analyze() {
+  const file = fileInput.files[0];
+  if (!file) { alert('Please upload a PDF resume first!'); return; }
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  document.getElementById('spinner').style.display = 'block';
+  document.getElementById('results').style.display  = 'none';
+
+  const fd = new FormData();
+  fd.append('resume', file);
+  fd.append('job_desc', document.getElementById('jobDesc').value);
+
+  try {
+    const res  = await fetch('/analyze', { method:'POST', body:fd });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    renderResults(data);
+  } catch(e) {
+    alert('Error analyzing resume. Please try again.');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('spinner').style.display = 'none';
+  }
+}
+
+function renderResults(d) {
+  document.getElementById('results').style.display = 'block';
+  // Score circle
+  const sc = d.ats_score;
+  const circle = document.getElementById('scoreCircle');
+  const color = sc>=80?'#34d399':sc>=65?'#60a5fa':sc>=50?'#fb923c':'#f87171';
+  circle.style.borderColor = color;
+  circle.style.color = color;
+  document.getElementById('scoreNum').textContent = sc;
+
+  const gb = document.getElementById('gradeBadge');
+  gb.textContent = 'Grade ' + d.grade;
+  gb.className = 'grade-badge grade-' + d.grade;
+
+  const msgs = {A:'Excellent! Your resume is ATS-optimised.',B:'Good resume. A few more keywords will push it higher.',C:'Average. Add missing keywords and quantify achievements.',D:'Needs significant improvement. Follow the tips below.'};
+  document.getElementById('scoreMsg').textContent = msgs[d.grade]||'';
+
+  // Stats
+  document.getElementById('wordCount').textContent = d.word_count;
+  document.getElementById('flagCount').textContent  = d.red_flags.length;
+
+  // JD score
+  if (d.jd_similarity >= 0) {
+    document.getElementById('jdCard').style.display = 'block';
+    document.getElementById('jdScore').textContent  = d.jd_similarity + '%';
+  }
+
+  // Breakdown bars
+  const bd = document.getElementById('breakdown');
+  bd.innerHTML = '';
+  Object.entries(d.breakdown).forEach(([cat, v], i) => {
+    const color = BAR_COLORS[i % BAR_COLORS.length];
+    bd.innerHTML += `
+      <div class="bar-row">
+        <div class="bar-label"><span>${cat}</span><span>${v.score}/${v.max} pts (${v.pct}%)</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${v.pct}%;background:${color}"></div></div>
+      </div>`;
+  });
+
+  // Missing keywords
+  const mc = document.getElementById('missingChips');
+  mc.innerHTML = d.missing_top.map(k=>`<span class="chip missing">✗ ${k}</span>`).join('');
+
+  // Red flags
+  const fc = document.getElementById('flagChips');
+  if (d.red_flags.length) {
+    fc.innerHTML = d.red_flags.map(f=>`<span class="chip flag">⚠ ${f}</span>`).join('');
+  } else {
+    fc.innerHTML = '<span class="chip found">✅ No major red flags found!</span>';
+  }
+
+  // Tips
+  const tp = document.getElementById('tips');
+  tp.innerHTML = d.tips.map(t=>`<div class="tip-row">💡 ${t}</div>`).join('');
+
+  document.getElementById('results').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
